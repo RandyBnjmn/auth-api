@@ -1,13 +1,13 @@
 import { BadRequestException, Injectable, InternalServerErrorException, UnauthorizedException } from '@nestjs/common';
-import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateAuthDto } from './dto/update-auth.dto';
+
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User } from './entities/user.entity';
 import * as bcrypt from "bcryptjs"
-import { LoginDto } from './dto/login.dto';
 import { JwtService } from '@nestjs/jwt';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
+import { LoginResponse } from './interfaces/login-response.interface';
+import { CreateUserDto, LoginDto, RegisterUserDto } from './dto';
 
 @Injectable()
 export class AuthService {
@@ -31,7 +31,6 @@ export class AuthService {
         {
           ...userData,
           password: bcrypt.hashSync(password, 10),
-
         }
       );
 
@@ -48,7 +47,18 @@ export class AuthService {
 
   }
 
-  async login(loginDto: LoginDto) {
+  async register(registerUserDto: RegisterUserDto): Promise<LoginResponse> {
+
+    const user = await this.create(registerUserDto);
+
+    return {
+      user,
+      token: this.generateJwt({ id: user._id })
+    }
+
+  }
+
+  async login(loginDto: LoginDto): Promise<LoginResponse> {
 
     const { email, password } = loginDto;
 
@@ -62,36 +72,37 @@ export class AuthService {
 
     const { password: _, ...rest } = user.toJSON()
 
-
     return {
-      ...rest,
+      user: rest,
       token: this.generateJwt({ id: user.id })
     }
 
   }
 
-  //GenerateToken
+  chekToken(user: User): LoginResponse {
+    return {
+      user,
+      token: this.generateJwt({ id: user._id })
+    }
+
+  }
+
+
   private generateJwt(payload: JwtPayload): string {
     const token = this.jwtService.sign(payload)
-
     return token;
-
   }
 
 
-  findAll() {
-    return `This action returns all auth`;
+  findAll(): Promise<User[]> {
+    return this.userModel.find();
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} auth`;
+  async findUserById(id: string) {
+    const user = await this.userModel.findById(id);
+    const { password, ...res } = user.toJSON();
+    return res;
   }
 
-  update(id: number, updateAuthDto: UpdateAuthDto) {
-    return `This action updates a #${id} auth`;
-  }
 
-  remove(id: number) {
-    return `This action removes a #${id} auth`;
-  }
 }
